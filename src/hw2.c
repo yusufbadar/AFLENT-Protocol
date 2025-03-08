@@ -23,7 +23,7 @@ void print_packet(unsigned char packet[])
 	unsigned int endianness = (header >> 1) & 0x1;
 	unsigned int last = header & 0x1;
 
-	printf("Array Number: #x\n", array_num);
+	printf("Array Number: %#x\n", array_num);
 	printf("Fragment Number: %x\n", frag_num);
 	printf("Length: %x\n", length);
 	printf("Encrypted: %x\n", encrypted);
