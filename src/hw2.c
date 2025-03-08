@@ -14,7 +14,7 @@
 
 void print_packet(unsigned char packet[])
 {
-	unsigned int header = ((unsigned int)packet[2] << 16) | ((unsigned int)packet[1] << 8) | (unsigned int)packet[0];
+	unsigned int header = ((unsigned int)packet[0] << 16) | ((unsigned int)packet[1] << 8) | (unsigned int)packet[2];
 	
 	unsigned int array_num = (header >> 18) & 0x3f;
 	unsigned int frag_num = (header >> 13) & 0x1F;
@@ -23,7 +23,7 @@ void print_packet(unsigned char packet[])
 	unsigned int endianness = (header >> 1) & 0x1;
 	unsigned int last = header & 0x1;
 
-	printf("Array Number: %x\n", array_num);
+	printf("Array Number: %d\n", array_num);
 	printf("Fragment Number: %x\n", frag_num);
 	printf("Length: %x\n", length);
 	printf("Encrypted: %x\n", encrypted);
