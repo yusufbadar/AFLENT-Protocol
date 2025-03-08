@@ -23,13 +23,14 @@ void print_packet(unsigned char packet[])
 	unsigned int endianness = (header >> 1) & 0x1;
 	unsigned int last = header & 0x1;
 
-	printf("%x\n", array_num);
-	printf("%x\n", frag_num);
-	printf("%x\n", length);
-	printf("%x\n", encrypted);
-	printf("%x\n", endianness);
-	printf("%x\n", last);
+	printf("Array Number: %x\n", array_num);
+	printf("Fragment Number: %x\n", frag_num);
+	printf("Length: %x\n", length);
+	printf("Encrypted: %x\n", encrypted);
+	printf("Endianness: %x\n", endianness);
+	printf("Last: %x\n", last);
 
+	printf("Data:");
 	int payload_start = 3;
 	for (unsigned int i = 0; i < length; i++) {
 		int offset = payload_start + i * 4;
