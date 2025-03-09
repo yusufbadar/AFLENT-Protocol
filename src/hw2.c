@@ -120,6 +120,7 @@ int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
     int **arrays = (int**)calloc(array_count, sizeof(int*));
     int *temp_sizes = (int*)calloc(array_count, sizeof(int));
+	
     int i = 0;
     while (i < MAX_PACKET_SIZE) {  
         if (i + HEADER_SIZE > MAX_PACKET_SIZE) break; 
@@ -150,7 +151,6 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         if (i + HEADER_SIZE > MAX_PACKET_SIZE) break;
 
         int array_num = packets[i];
-        int frag_num = packets[i + 1];
         unsigned char flags = packets[i + 2];
         int length = packets[i + 3];
         int is_little_endian = flags & 1;
