@@ -11,7 +11,7 @@
 #include <errno.h>
 
 #ifndef FALLBACK_PACKET_SIZE
-#define FALLBACK_PACKET_SIZE 0
+#define FALLBACK_PACKET_SIZE 32
 #endif
 
 int total_packets_bytes = 0;
