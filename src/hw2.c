@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#define HEADER_SIZE 4
+
 int total_packets_bytes = 0;
 
 struct packet_info {
@@ -104,101 +106,82 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 	return packet_buffer;
 }
 
-int** create_arrays(unsigned char packets[], int array_count, int *array_lengths)
-{
-	
-	int offset = 0;
-	int fragment_count = 0;
-	while (offset < total_packets_bytes) {
-		unsigned int header = ((unsigned int)packets[offset] << 16) | ((unsigned int)packets[offset+1] << 8) | (unsigned int)packets[offset + 2];
-		int frag_length = (header >> 3) & 0x3FF;
-		int packet_size = 3 + frag_length * 4;
-		fragment_count++;
-		offset += packet_size;
-	}
+int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
+    int value;
+    if (is_little_endian) {
+        value = (data[3] << 24) | (data[2] << 16) | (data[1] << 8) | data[0];
+    } else {
+        value = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
+    }
+    return value;
+}
 
-	struct packet_info*pinfo = malloc(fragment_count * sizeof(struct packet_info));
-	if (pinfo == NULL) {
-		return NULL;
-	}
+int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
+    int value;
+    if (is_little_endian) {
+        value = (data[3] << 24) | (data[2] << 16) | (data[1] << 8) | data[0];
+    } else {
+        value = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
+    }
+    return value;
+}
 
-	int *total_ints = calloc(array_count, sizeof(int));
-	if (total_ints == NULL) {
-		free(pinfo);
-		return NULL;
-	}
+int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
+    int **arrays = (int**)calloc(array_count, sizeof(int*));
+    int *temp_sizes = (int*)calloc(array_count, sizeof(int));
 
-	offset = 0;
-	int idx = 0;
-	while (offset < total_packets_bytes) {
-		unsigned int header = ((unsigned int)packets[offset] << 16) | ((unsigned int)packets[offset + 1] << 8) | (unsigned int)packets[offset + 2];
+    int i = 0;
+    while (i < 256) {
+        if (i + HEADER_SIZE > 256) break;
 
-		int array_num = (header >> 18) & 0x3F;
-		int frag_num = (header >> 13) & 0x1F;
-		int frag_length = (header >> 3) & 0x3FF;
-		int endian = (header >> 1) & 0x1;
+        int array_num = packets[i];
+        unsigned char flags = packets[i + 2];
+        int length = packets[i + 3];
 
-		int packet_size = 3 + frag_length * 4;
-		pinfo[idx].array_number = array_num;
-		pinfo[idx].frag_number = frag_num;
-		pinfo[idx].frag_length = frag_length;
-		pinfo[idx].endianness = endian;
-		pinfo[idx].payload_offset = offset + 3;
+        i += HEADER_SIZE;
+        
+        if (array_num >= array_count) {
+            i += length * 4;
+            continue;
+        }
 
-		if (array_num < array_count) {
-			total_ints[array_num] += frag_length;
-		}
-		idx++;
-		offset+= packet_size;
-	}
-	int **result = malloc(array_count * sizeof(int *));
-	if (result == NULL) {
-		free(pinfo);
-		free(total_ints);
-		return NULL;
-	}
-	for (int a = 0; a < array_count; a++) {
-		if (total_ints[a] > 0) {
-			result[a] = malloc(total_ints[a] * sizeof(int));
-			if (result[a] == NULL) {
-				for (int j = 0; j < a; j++) {
-					free(result[j]);
-				}
-				free(result);
-				free(pinfo);
-				free(total_ints);
-			}
-		} else {
-			result[a] = NULL;
-		}
-		array_lengths[a] = total_ints[a];
-	}
+        array_lengths[array_num] += length;
+        temp_sizes[array_num] += length;
+        i += length * 4;
+    }
 
-	for (int i = 0; i < fragment_count; i++) {
-		int arr = pinfo[i].array_number;
-		int frag = pinfo[i].frag_number;
-		int frag_len = pinfo[i].frag_length;
-		int offset_in_array = 0;
+    for (int j = 0; j < array_count; j++) {
+        if (temp_sizes[j] > 0) {
+            arrays[j] = (int*)malloc(temp_sizes[j] * sizeof(int));
+        }
+    }
+    
+    int *current_positions = (int*)calloc(array_count, sizeof(int));
+    i = 0;
+    while (i < 256) {
+        if (i + HEADER_SIZE > 256) break;
 
-		for (int j = 0; j < fragment_count; j++) {
-			if (pinfo[j].array_number == arr && pinfo[j].frag_number < frag) {
-				offset_in_array += pinfo[j].frag_length;
-			}
-		}
-		int payload_offset = pinfo[i].payload_offset;
-		for (int k = 0; k < frag_len; k++) {
-			int value;
-			if (pinfo[i].endianness == 0) {
-				value = ((unsigned int)packets[payload_offset + k * 4] << 24) | ((unsigned int)packets[payload_offset + k * 4 + 1] << 16) | ((unsigned int)packets[payload_offset + k * 4 + 2] << 8) | ((unsigned int)packets[payload_offset + k * 4 + 3]);
-			} else {
-				value = ((unsigned int)packets[payload_offset + k * 4 + 3] << 24) | ((unsigned int)packets[payload_offset + k * 4 + 2] << 16) | ((unsigned int)packets[payload_offset + k * 4 + 1] << 8) | ((unsigned int)packets[payload_offset + k * 4]);
-			}
-			result[arr][offset_in_array + k] = value;
-		}
-	}
-	free(pinfo);
-	free(total_ints);
-	return result;
+        int array_num = packets[i];
+        unsigned char flags = packets[i + 2];
+        int length = packets[i + 3];
+        int is_little_endian = flags & 1;
+
+        i += HEADER_SIZE;
+        
+        if (array_num >= array_count || !arrays[array_num]) {
+            i += length * 4;
+            continue;
+        }
+
+        for (int j = 0; j < length; j++) {
+            arrays[array_num][current_positions[array_num]++] = convert_bytes_to_int(&packets[i], is_little_endian);
+            i += 4;
+        }
+    }
+
+    free(temp_sizes);
+    free(current_positions);
+    return arrays;
 }
 
 
