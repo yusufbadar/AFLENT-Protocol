@@ -184,7 +184,9 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     free(expected_fragments);
     return result;
 }
+
 #define EXPANDED_KEYS_LENGTH 32
+#define KEY_CONST 0x5C6EF368U
 
 typedef uint64_t sbu_key_t;
 typedef uint32_t block_t;
@@ -203,127 +205,157 @@ block_t table[] = {
 
 // ----------------- Bitwise Functions ----------------- //
 
-uint8_t rotl(uint8_t x, uint8_t shamt)
-{
-	(void) x;
-	(void) shamt;
-    return 0;
+uint8_t rotl8(uint8_t x, uint8_t shamt) {
+    return (x << shamt) | (x >> (8 - shamt));
 }
 
-uint8_t rotr(uint8_t x, uint8_t shamt)
-{
-	(void) x;
-	(void) shamt;
-    return 0;
+uint32_t rotl32(uint32_t x, uint8_t shamt) {
+    return (x << shamt) | (x >> (32 - shamt));
 }
 
-block_t reverse(block_t x)
-{
-	(void) x;
-    return 0;
+block_t reverse(block_t x) {
+    block_t y = 0;
+    for (int i = 0; i < 32; i++) {
+        y |= ((x >> i) & 1) << (31 - i);
+    }
+    return y;
 }
 
-block_t shuffle4(block_t x)
-{
-	(void) x;
-    return 0;
+block_t shuffle4(block_t x) {
+    block_t result = 0;
+    for (int i = 0; i < 4; i++) {
+        result |= ((x >> (16 + 4 * i)) & 0xF) << (8 * i + 4);
+        result |= ((x >> (4 * i)) & 0xF) << (8 * i);
+    }
+    return result;
 }
 
-block_t unshuffle4(block_t x)
-{
-	(void) x;
-    return 0;
+block_t unshuffle4(block_t x) {
+    block_t result = 0;
+    for (int i = 0; i < 4; i++) {
+        result |= ((x >> (8 * i + 4)) & 0xF) << (16 + 4 * i);
+        result |= ((x >> (8 * i)) & 0xF) << (4 * i);
+    }
+    return result;
 }
 
-block_t shuffle1(block_t x)
-{
-	(void) x;
-    return 0;
+block_t shuffle1(block_t x) {
+    block_t result = 0;
+    for (int i = 0; i < 16; i++) {
+        result |= ((x >> (16 + i)) & 1) << (2 * i + 1);
+        result |= ((x >> i) & 1) << (2 * i);
+    }
+    return result;
 }
 
-block_t unshuffle1(block_t x)
-{
-	(void) x;
-    return 0;
+block_t unshuffle1(block_t x) {
+    block_t result = 0;
+    for (int i = 0; i < 16; i++) {
+        result |= ((x >> (2 * i + 1)) & 1) << (16 + i);
+        result |= ((x >> (2 * i)) & 1) << i;
+    }
+    return result;
 }
 
-uint8_t nth_byte(block_t x, uint8_t n)
-{
-	(void) x;
-	(void) n;
-    return 0;
+uint8_t nth_byte(block_t x, uint8_t n) {
+    return (x >> (n * 8)) & 0xFF;
 }
 
 // ----------------- Encryption Functions ----------------- //
 
-void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys)
-{
-	(void) key;
-	(void) expanded_keys;
+void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys) {
+    uint32_t upper = key >> 32;
+    uint32_t lower = key & 0xFFFFFFFF;
+    expanded_keys[0] = (upper ^ lower) ^ KEY_CONST;
+    expanded_keys[1] = (upper + lower) ^ KEY_CONST;
+    uint32_t delta = 0x9e3779b9;
+    uint32_t sum = KEY_CONST;
+    for (int i = 2; i < EXPANDED_KEYS_LENGTH; i++) {
+        sum += delta;
+        expanded_keys[i] = (expanded_keys[i - 1] + expanded_keys[i - 2]) ^ sum;
+    }
 }
 
-block_t scramble(block_t x, block_t *keys, uint32_t round, permute_func_t op)
-{
-	(void) x;
-	(void) keys;
-	(void) round;
-	(void) op;
-    return 0;
+block_t scramble_op(block_t x, block_t key, uint8_t round) {
+    uint8_t b0 = nth_byte(x, 0) ^ nth_byte(key, 0);
+    uint8_t b1 = nth_byte(x, 1) ^ (~nth_byte(key, 1));
+    uint8_t b2 = nth_byte(x, 2) ^ nth_byte(key, 2);
+    uint8_t b3 = nth_byte(x, 3) ^ (~nth_byte(key, 3));
+    block_t y = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+    return rotl32(y, round % 32);
 }
 
-block_t mash(block_t x, block_t *keys)
-{
-	(void) x;
-	(void) keys;
-    return 0;
+
+block_t scramble(block_t x, block_t *keys, uint32_t round, permute_func_t op) {
+  return op(scramble_op(x, keys[round], round % 8));
 }
 
-block_t sbu_encrypt_block(block_t plain_text, block_t *expanded_keys)
-{
-	(void) plain_text;
-	(void) expanded_keys;
-
-    return 0;
+block_t mash(block_t x) {
+    block_t mix = 0;
+    for (int i = 0; i < 4; i++) {
+        mix ^= table[nth_byte(x, i) & 0x3F];
+    }
+    return x ^ mix;
 }
 
-block_t r_scramble(block_t x, block_t *keys, uint32_t round, permute_func_t op)
-{
-	(void) x;
-	(void) keys;
-	(void) round;
-	(void) op;
+block_t sbu_encrypt_block(block_t plain_text, block_t *expanded_keys) {
+    block_t r = plain_text;
 
-    return 0;
+    permute_func_t ops[4] = {reverse, shuffle4, shuffle1, reverse};
+
+    for (uint32_t round = 0; round < 4; round++) {
+        r = scramble(r, expanded_keys, round, ops[round]);
+        r = mash(r);
+    }
+    return r;
 }
 
-block_t r_mash(block_t x, block_t *keys)
-{
-	(void) x;
-	(void) keys;
-	return 0;
+
+block_t r_scramble_op(block_t x, block_t key, uint8_t round) {
+    x = rotl32(x, 32 - (round % 32));
+    uint8_t b0 = nth_byte(x, 0) ^ nth_byte(key, 0);
+    uint8_t b1 = nth_byte(x, 1) ^ (~nth_byte(key, 1));
+    uint8_t b2 = nth_byte(x, 2) ^ nth_byte(key, 2);
+    uint8_t b3 = nth_byte(x, 3) ^ (~nth_byte(key, 3));
+
+    return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
 }
 
-block_t sbu_decrypt_block(block_t cipher_text, block_t *expanded_keys)
-{
-	(void) cipher_text;
-	(void) expanded_keys;
-	return 0;
+block_t r_scramble(block_t x, block_t *keys, uint32_t round, permute_func_t op) {
+    return r_scramble_op(op(x), keys[round], round % 8);
 }
 
-void sbu_encrypt(uint8_t *plaintext_input, block_t *encrypted_output, size_t pt_len, uint32_t *expanded_keys)
-{
-	(void) plaintext_input;
-	(void) encrypted_output;
-	(void) pt_len;
-	(void) expanded_keys;
+
+block_t r_mash(block_t x) {
+    return mash(x);
 }
 
-void sbu_decrypt(block_t *encrypted_input, char *plaintext_output, size_t pt_len, uint32_t *expanded_keys)
-{
-	(void) encrypted_input;
-	(void) plaintext_output;
-	(void) pt_len;
-	(void) expanded_keys;
+
+block_t sbu_decrypt_block(block_t cipher_text, block_t *expanded_keys) {
+    block_t r = cipher_text;
+    permute_func_t ops[4] = {reverse, unshuffle4, unshuffle1, reverse};
+    for (int round = 3; round >= 0; round--) {
+        r = r_mash(r);
+        r = r_scramble(r, expanded_keys, round, ops[round]);
+    }
+    return r;
+}
+
+
+
+void sbu_encrypt(uint8_t *plaintext_input, block_t *encrypted_output, size_t pt_len, uint32_t *expanded_keys) {
+    for (size_t i = 0; i < pt_len / 4; i++) {
+        block_t plain_block;
+        memcpy(&plain_block, plaintext_input + i * 4, 4);
+        encrypted_output[i] = sbu_encrypt_block(plain_block, expanded_keys);
+    }
+}
+
+void sbu_decrypt(block_t *encrypted_input, uint8_t *plaintext_output, size_t pt_len, uint32_t *expanded_keys) {
+    for (size_t i = 0; i < pt_len / 4; i++) {
+        block_t decrypted_block = sbu_decrypt_block(encrypted_input[i], expanded_keys);
+        memcpy(plaintext_output + i * 4, &decrypted_block, 4);
+    }
 }
 
 // ----------------- Utility Functions ----------------- //
