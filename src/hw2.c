@@ -280,17 +280,16 @@ uint8_t nth_byte(block_t x, uint8_t i) {
 
 // ----------------- Encryption Functions ----------------- //
 
-void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys) {
-    uint32_t upper = (uint32_t)(key >> 32);
-    uint32_t lower = (uint32_t)key;
-    const uint32_t key_const = 0x5C60CA78;
-    expanded_keys[0] = (upper ^ lower) ^ key_const;
-    expanded_keys[1] = (upper + lower) ^ key_const;
-    uint32_t delta = 0x9e3779b9;
-    uint32_t sum = 0;
-    for (int i = 2; i < EXPANDED_KEYS_LENGTH; i++) {
-        sum += delta;
-        expanded_keys[i] = (expanded_keys[i - 2] + expanded_keys[i - 1]) ^ sum;
+void sbu_expand_keys(sbu_key_t key, block_t *S) {
+    S[0] = (uint32_t)(key & 0xFFFFFFFF);
+    S[1] = (uint32_t)(key >> 32);
+    for (int i = 2; i < 32; i++) {
+        uint32_t idx = (S[i - 1] ^ S[i - 2]) % 32;
+        S[i] = table[idx] ^ S[i - 1];
+    }
+    for (int i = 29; i >= 0; i--) {
+        uint32_t idx = (S[i + 1] ^ S[i + 2]) % 32;
+        S[i] = table[idx] ^ S[i];
     }
 }
 
