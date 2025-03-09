@@ -115,23 +115,33 @@ int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
     }
 }
 
+// create_arrays:
+// packets: a contiguous array of AFLENT packets (each packet has a 3-byte header, then payload)
+// array_count: number of arrays expected (each array is identified by its array number, 0..array_count-1)
+// array_lengths: an output array (of length array_count) to be updated with the total number of ints per array.
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
+    // --- First Pass: Count fragments ---
     int offset = 0;
     int fragment_count = 0;
     while (offset < total_packets_bytes) {
+        // The header is stored in 3 bytes; combine them into a 24-bit value.
         unsigned int header = ((unsigned int)packets[offset] << 16) |
                               ((unsigned int)packets[offset + 1] << 8) |
                                (unsigned int)packets[offset + 2];
+        // The length (number of ints) is in bits 12-3.
         int frag_length = (header >> 3) & 0x3FF;
         int packet_size = 3 + frag_length * 4;
         fragment_count++;
         offset += packet_size;
     }
 
+    // Allocate temporary storage for fragment header info.
     struct packet_info *pinfo = malloc(fragment_count * sizeof(struct packet_info));
     if (pinfo == NULL) {
         return NULL;
     }
+
+    // Allocate an array to tally the total number of ints per array.
     int *total_ints = calloc(array_count, sizeof(int));
     if (total_ints == NULL) {
         free(pinfo);
@@ -141,21 +151,19 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     offset = 0;
     int idx = 0;
     while (offset < total_packets_bytes) {
-        unsigned int header = ((unsigned int)packets[offset] << 16) |
-                              ((unsigned int)packets[offset + 1] << 8) |
-                               (unsigned int)packets[offset + 2];
-
-        int array_num   = (header >> 18) & 0x3F;
-        int frag_num    = (header >> 13) & 0x1F;
+        unsigned int header = ((unsigned int)packets[offset] << 16) | ((unsigned int)packets[offset + 1] << 8) | (unsigned int)packets[offset + 2];
+        int array_num = (header >> 18) & 0x3F;
+        int frag_num = (header >> 13) & 0x1F;
         int frag_length = (header >> 3)  & 0x3FF;
-        int endian      = (header >> 1)  & 0x1;
+        int endian = (header >> 1)  & 0x1;
         int packet_size = 3 + frag_length * 4;
 
-        pinfo[idx].array_number  = array_num;
-        pinfo[idx].frag_number   = frag_num;
-        pinfo[idx].frag_length   = frag_length;
-        pinfo[idx].endianness    = endian;
-        pinfo[idx].payload_offset = offset + 3; 
+        pinfo[idx].array_number = array_num;
+        pinfo[idx].frag_number = frag_num;
+        pinfo[idx].frag_length = frag_length;
+        pinfo[idx].endianness = endian;
+        pinfo[idx].payload_offset = offset + 3;
+
         if (array_num < array_count) {
             total_ints[array_num] += frag_length;
         }
