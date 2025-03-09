@@ -266,13 +266,13 @@ uint8_t nth_byte(block_t x, uint8_t n) {
 void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys) {
     uint32_t upper = (uint32_t)(key >> 32);
     uint32_t lower = (uint32_t)key;
-    expanded_keys[0] = (upper ^ lower) ^ KEY_CONST;
-    expanded_keys[1] = (upper + lower) ^ KEY_CONST;
+    expanded_keys[0] = upper ^ lower;
+    expanded_keys[1] = upper + lower;
     uint32_t delta = 0x9e3779b9;
-    uint32_t sum = KEY_CONST;
+    uint32_t sum = 0;
     for (int i = 2; i < EXPANDED_KEYS_LENGTH; i++) {
         sum += delta;
-        expanded_keys[i] = (expanded_keys[i - 2] + expanded_keys[i - 1]) ^ sum;
+        expanded_keys[i] = (expanded_keys[i - 1] + expanded_keys[i - 2]) ^ sum;
     }
 }
 
