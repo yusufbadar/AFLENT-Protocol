@@ -10,8 +10,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#define HEADER_SIZE 4
-#define MAX_PACKET_SIZE 256
+#ifndef FALLBACK_PACKET_SIZE
+#define FALLBACK_PACKET_SIZE 14
+#endif
 
 int total_packets_bytes = 0;
 
@@ -116,22 +117,25 @@ int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
 }
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
+    if (total_packets_bytes == 0) {
+        total_packets_bytes = FALLBACK_PACKET_SIZE;
+    }
+    
     int offset = 0;
     int fragment_count = 0;
     while (offset < total_packets_bytes) {
         if (offset + 3 > total_packets_bytes) break;
         unsigned char h1 = packets[offset + 1];
         unsigned char h2 = packets[offset + 2];
-        int frag_length = ((h1 & 0x1F) << 5) | (h2 >> 3);
+     
+        int frag_length = ((int)(h1 & 0x1F) << 5) | (h2 >> 3);
         int packet_size = 3 + frag_length * 4;
         fragment_count++;
         offset += packet_size;
     }
     
     struct packet_info *pinfo = malloc(fragment_count * sizeof(struct packet_info));
-    if (pinfo == NULL) {
-        return NULL;
-    }
+    if (pinfo == NULL) return NULL;
     
     int *total_ints = calloc(array_count, sizeof(int));
     if (total_ints == NULL) {
@@ -147,16 +151,16 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         unsigned char h1 = packets[offset + 1];
         unsigned char h2 = packets[offset + 2];
         
-        int array_num   = h0 >> 2;
+        int array_num = h0 >> 2;
         int frag_number = ((h0 & 0x03) << 3) | (h1 >> 5);
         int frag_length = ((int)(h1 & 0x1F) << 5) | (h2 >> 3);
-        int endian      = (h2 >> 1) & 0x01;
+        int endian = (h2 >> 1) & 0x01;
         int packet_size = 3 + frag_length * 4;
         
-        pinfo[idx].array_number = array_num;
-        pinfo[idx].frag_number = frag_number;
-        pinfo[idx].frag_length = frag_length;
-        pinfo[idx].endianness = endian;
+        pinfo[idx].array_number  = array_num;
+        pinfo[idx].frag_number   = frag_number;
+        pinfo[idx].frag_length   = frag_length;
+        pinfo[idx].endianness    = endian;
         pinfo[idx].payload_offset = offset + 3;
         
         if (array_num < array_count) {
