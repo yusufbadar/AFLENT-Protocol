@@ -191,6 +191,7 @@ typedef uint64_t sbu_key_t;
 typedef uint32_t block_t;
 typedef block_t(*permute_func_t)(block_t);
 
+
 uint8_t rot_table[4]  = {2, 3, 5, 7};
 uint8_t r_rot_table[4] = {7, 5, 3, 2};
 
@@ -444,5 +445,3 @@ void sbu_decrypt(block_t *encrypted_input, uint8_t *plaintext_output, size_t pt_
         }
     }
 }
-
-// ----------------- Utility Functions ----------------- //
