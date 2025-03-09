@@ -280,18 +280,20 @@ uint8_t nth_byte(block_t x, uint8_t i) {
 
 // ----------------- Encryption Functions ----------------- //
 
-void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys) {
-    expanded_keys[0] = (block_t)(key & 0xFFFFFFFFu);
-    expanded_keys[1] = (block_t)((key >> 32) & 0xFFFFFFFFu);
+void sbu_expand_keys(sbu_key_t key, block_t *S)
+{
+    S[0] = (block_t)(key & 0xFFFFFFFFu);
+    S[1] = (block_t)((key >> 32) & 0xFFFFFFFFu);
     for (int i = 2; i < 32; i++) {
-        block_t idx = (expanded_keys[i - 1] ^ expanded_keys[i - 2]) % 32;
-        expanded_keys[i] = table[idx] ^ expanded_keys[i - 1];
+        block_t idx = (S[i - 1] ^ S[i - 2]) & 0x1F;
+        S[i] = table[idx] ^ S[i - 1];
     }
     for (int i = 29; i >= 0; i--) {
-        block_t idx = (expanded_keys[i + 1] ^ expanded_keys[i + 2]) % 32;
-        expanded_keys[i] = table[idx] ^ expanded_keys[i];
+        block_t idx = (S[i + 1] ^ S[i + 2]) & 0x1F;
+        S[i] = table[idx] ^ S[i];
     }
 }
+
 
 static const uint8_t rot_table[4] = {2, 3, 5, 7};
 
