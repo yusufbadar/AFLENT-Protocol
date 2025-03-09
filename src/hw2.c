@@ -407,8 +407,8 @@ block_t decrypt_block(block_t B, uint32_t *S)
 
 void sbu_expand_keys(sbu_key_t key, block_t *S)
 {
-    S[0] = (block_t)((key >> 32) & 0xFFFFFFFFULL);
-    S[1] = (block_t)(key & 0xFFFFFFFFULL);
+    S[1] = (block_t)((key >> 32) & 0xFFFFFFFFULL);
+    S[0] = (block_t)(key & 0xFFFFFFFFULL);
 
     for (int i = 2; i < EXPANDED_KEYS_LENGTH; i++) {
         uint32_t temp = S[i - 1] ^ S[i - 2];
