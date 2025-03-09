@@ -49,12 +49,51 @@ void print_packet(unsigned char packet[])
 
 unsigned char* build_packets(int data[], int data_length, int max_fragment_size, int endianness, int array_number)
 {
-	(void) data; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) data_length; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) max_fragment_size; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) endianness; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) array_number; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-    return NULL;
+	int ints_per_fragment = max_fragment_size/4;
+	if (ints_per_fragment <= 0) {
+		ints_per_fragment = 1;
+	}
+
+	int num_fragments = (data_length + ints_per_fragment - 1)/ints_per_fragment;
+	int total_bytes = num_fragments * 3 + data_length * 4;
+
+	unsigned char *packet_buffer = malloc(total_bytes);
+	if (packet_buffer == NULL) {
+		return NULL;
+	}
+
+	int offset = 0;
+	int data_index = 0;
+
+	for (int frag = 0; frag < num_fragments; frag++) {
+		int frag_int_count = (data_length - data_index < ints_per_fragment) ? (data_length - data_index) : ints_per_fragment;
+		
+		int last = (frag == num_fragments - 1) ? 1 : 0;
+
+		unsigned int header = ((unsigned int)array_number << 18) | ((unsigned int)frag << 13) | ((unsigned int)frag_int_count << 3) | (0 << 2) | ((unsigned int)endianness << 1) | ((unsigned int)last);
+
+		packet_buffer[offset] = (header >> 16) & 0xFF;
+		packet_buffer[offset + 1] = (header >> 8) & 0xFF;
+		packet_buffer[offset + 2] = header & 0xFF;
+		offset += 3;
+
+		for (int i = 0; i < frag_int_count; i++) {
+			int value = data[data_index++];
+			if (endianness == 0) {
+				packet_buffer[offset] = (value >> 24) & 0xFF;
+				packet_buffer[offset + 1] = (value >> 16) & 0xFF;
+				packet_buffer[offset + 2] = (value >> 8) & 0xFF;
+				packet_buffer[offset + 3] = value & 0xFF;
+			} else {
+				packet_buffer[offset] = value & 0xFF;
+				packet_buffer[offset + 1] = (value >> 8) & 0xFF;
+				packet_buffer[offset + 2] = (value >> 16) & 0xFF;
+				packet_buffer[offset + 3] = (value >> 24) & 0xFF;
+			}
+			offset += 4;
+		} 
+	}
+	return packet_buffer;
 }
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths)
