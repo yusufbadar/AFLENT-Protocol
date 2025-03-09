@@ -405,18 +405,19 @@ block_t decrypt_block(block_t B, uint32_t *S)
     return B;
 }
 
-void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys)
+void sbu_expand_keys(sbu_key_t key, block_t *S)
 {
-    expanded_keys[0] = (block_t)((key >> 32) & 0xFFFFFFFF);
-    expanded_keys[1] = (block_t)(key & 0xFFFFFFFF);
+    S[0] = (block_t)(key & 0xFFFFFFFF);
+    S[1] = (block_t)((key >> 32) & 0xFFFFFFFF);
 
     for (int i = 2; i < EXPANDED_KEYS_LENGTH; i++) {
-        uint32_t temp = expanded_keys[i - 1] ^ expanded_keys[i - 2];
-        expanded_keys[i] = table[temp & 0x1F] ^ expanded_keys[i - 1];
+        uint32_t index = (S[i - 1] ^ S[i - 2]) % 32;
+        S[i] = table[index] ^ S[i - 1];
     }
+
     for (int i = EXPANDED_KEYS_LENGTH - 3; i >= 0; i--) {
-        uint32_t temp = expanded_keys[i + 1] ^ expanded_keys[i + 2];
-        expanded_keys[i] = table[temp & 0x1F] ^ expanded_keys[i];
+        uint32_t index = (S[i + 1] ^ S[i + 2]) % 32;
+        S[i] = table[index] ^ S[i];
     }
 }
 
