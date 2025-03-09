@@ -116,26 +116,15 @@ int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
     return value;
 }
 
-int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
-    int value;
-    if (is_little_endian) {
-        value = (data[3] << 24) | (data[2] << 16) | (data[1] << 8) | data[0];
-    } else {
-        value = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
-    }
-    return value;
-}
-
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
     int **arrays = (int**)calloc(array_count, sizeof(int*));
-    int *temp_sizes = (int*)calloc(array_count, sizeof(int));
+    int *temp_sizes = (int*)calloc(array_count, sizeof(int)); 
 
     int i = 0;
     while (i < 256) {
         if (i + HEADER_SIZE > 256) break;
 
         int array_num = packets[i];
-        unsigned char flags = packets[i + 2];
         int length = packets[i + 3];
 
         i += HEADER_SIZE;
