@@ -63,9 +63,9 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 	}
 
 	int num_fragments = (data_length + ints_per_fragment - 1)/ints_per_fragment;
-	int total_bytes = num_fragments * 3 + data_length * 4;
+	int total_packets_bytes = num_fragments * 3 + data_length * 4;
 
-	unsigned char *packet_buffer = malloc(total_bytes);
+	unsigned char *packet_buffer = malloc(total_packets_bytes);
 	if (packet_buffer == NULL) {
 		return NULL;
 	}
