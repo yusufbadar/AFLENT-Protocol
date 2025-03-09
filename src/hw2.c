@@ -120,16 +120,18 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     int fragment_count = 0;
     while (offset < total_packets_bytes) {
         if (offset + 3 > total_packets_bytes) break;
-        unsigned char h1 = packets[offset+1];
-        unsigned char h2 = packets[offset+2];
-        int frag_length = ((int)(h1 & 0x1F) << 5) | (h2 >> 3);
+        unsigned char h1 = packets[offset + 1];
+        unsigned char h2 = packets[offset + 2];
+        int frag_length = ((h1 & 0x1F) << 5) | (h2 >> 3);
         int packet_size = 3 + frag_length * 4;
         fragment_count++;
         offset += packet_size;
     }
     
     struct packet_info *pinfo = malloc(fragment_count * sizeof(struct packet_info));
-    if (pinfo == NULL) return NULL;
+    if (pinfo == NULL) {
+        return NULL;
+    }
     
     int *total_ints = calloc(array_count, sizeof(int));
     if (total_ints == NULL) {
@@ -142,8 +144,8 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     while (offset < total_packets_bytes) {
         if (offset + 3 > total_packets_bytes) break;
         unsigned char h0 = packets[offset];
-        unsigned char h1 = packets[offset+1];
-        unsigned char h2 = packets[offset+2];
+        unsigned char h1 = packets[offset + 1];
+        unsigned char h2 = packets[offset + 2];
         
         int array_num   = h0 >> 2;
         int frag_number = ((h0 & 0x03) << 3) | (h1 >> 5);
@@ -151,10 +153,10 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         int endian      = (h2 >> 1) & 0x01;
         int packet_size = 3 + frag_length * 4;
         
-        pinfo[idx].array_number  = array_num;
-        pinfo[idx].frag_number   = frag_number;
-        pinfo[idx].frag_length   = frag_length;
-        pinfo[idx].endianness    = endian;
+        pinfo[idx].array_number = array_num;
+        pinfo[idx].frag_number = frag_number;
+        pinfo[idx].frag_length = frag_length;
+        pinfo[idx].endianness = endian;
         pinfo[idx].payload_offset = offset + 3;
         
         if (array_num < array_count) {
@@ -174,7 +176,9 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         if (total_ints[a] > 0) {
             result[a] = malloc(total_ints[a] * sizeof(int));
             if (result[a] == NULL) {
-                for (int j = 0; j < a; j++) free(result[j]);
+                for (int j = 0; j < a; j++) {
+                    free(result[j]);
+                }
                 free(result);
                 free(pinfo);
                 free(total_ints);
@@ -207,7 +211,6 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     free(total_ints);
     return result;
 }
-
 
 //Encryption Code:
 
