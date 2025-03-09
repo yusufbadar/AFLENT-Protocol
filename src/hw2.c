@@ -11,6 +11,7 @@
 #include <errno.h>
 
 #define HEADER_SIZE 4
+#define MAX_PACKET_SIZE 256
 
 int total_packets_bytes = 0;
 
@@ -118,11 +119,10 @@ int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
     int **arrays = (int**)calloc(array_count, sizeof(int*));
-    int *temp_sizes = (int*)calloc(array_count, sizeof(int)); 
-
+    int *temp_sizes = (int*)calloc(array_count, sizeof(int));
     int i = 0;
-    while (i < 256) {
-        if (i + HEADER_SIZE > 256) break;
+    while (i < MAX_PACKET_SIZE) {  
+        if (i + HEADER_SIZE > MAX_PACKET_SIZE) break; 
 
         int array_num = packets[i];
         int length = packets[i + 3];
@@ -134,23 +134,23 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
             continue;
         }
 
-        array_lengths[array_num] += length;
         temp_sizes[array_num] += length;
-        i += length * 4;
     }
 
     for (int j = 0; j < array_count; j++) {
         if (temp_sizes[j] > 0) {
-            arrays[j] = (int*)malloc(temp_sizes[j] * sizeof(int));
+            arrays[j] = (int*)calloc(temp_sizes[j], sizeof(int));
+            array_lengths[j] = temp_sizes[j];
         }
     }
     
     int *current_positions = (int*)calloc(array_count, sizeof(int));
     i = 0;
-    while (i < 256) {
-        if (i + HEADER_SIZE > 256) break;
+    while (i < MAX_PACKET_SIZE) {
+        if (i + HEADER_SIZE > MAX_PACKET_SIZE) break;
 
         int array_num = packets[i];
+        int frag_num = packets[i + 1];
         unsigned char flags = packets[i + 2];
         int length = packets[i + 3];
         int is_little_endian = flags & 1;
