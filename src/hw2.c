@@ -10,7 +10,15 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-//Packet Code:
+int total_packets_bytes = 0;
+
+struct packet_info {
+	int array_number;
+	int frag_number;
+	int frag_length;
+	int endianness;
+	int payload_offset;
+};
 
 void print_packet(unsigned char packet[])
 {
@@ -98,10 +106,99 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths)
 {
-    (void) packets; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) array_count; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) array_lengths; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-    return NULL;
+	
+	int offset = 0;
+	int fragment_count = 0;
+	while (offset < total_packets_bytes) {
+		unsigned int header = ((unsigned int)packets[offset] << 16) | ((unsigned int)packets[offset+1] << 8) | (unsigned int)packets[offset + 2];
+		int frag_length = (header >> 3) & 0x3FF;
+		int packet_size = 3 + frag_length * 4;
+		fragment_count++;
+		offset += packet_size;
+	}
+
+	struct packet_info*pinfo = malloc(fragment_count * sizeof(struct packet_info));
+	if (pinfo == NULL) {
+		return NULL;
+	}
+
+	int *total_ints = calloc(array_count, sizeof(int));
+	if (total_ints == NULL) {
+		free(pinfo);
+		return NULL;
+	}
+
+	offset = 0;
+	int idx = 0;
+	while (offset < total_packets_bytes) {
+		unsigned int header = ((unsigned int)packets[offset] << 16) | ((unsigned int)packets[offset + 1] << 8) | (unsigned int)packets[offset + 2];
+
+		int array_num = (header >> 18) & 0x3F;
+		int frag_num = (header >> 13) & 0x1F;
+		int frag_length = (header >> 3) & 0x3FF;
+		int endian = (header >> 1) & 0x1;
+
+		int packet_size = 3 + frag_length * 4;
+		pinfo[idx].array_number = array_num;
+		pinfo[idx].frag_number = frag_num;
+		pinfo[idx].frag_length = frag_length;
+		pinfo[idx].endianness = endian;
+		pinfo[idx].payload_offset = offset + 3;
+
+		if (array_num < array_count) {
+			total_ints[array_num] += frag_length;
+		}
+		idx++;
+		offset+= packet_size;
+	}
+	int **result = malloc(array_count * sizeof(int *));
+	if (result == NULL) {
+		free(pinfo);
+		free(total_ints);
+		return NULL;
+	}
+	for (int a = 0; a < array_count; a++) {
+		if (total_ints[a] > 0) {
+			result[a] = malloc(total_ints[a] * sizeof(int));
+			if (result[a] == NULL) {
+				for (int j = 0; j < a; j++) {
+					free(result[j]);
+				}
+				free(result);
+				free(pinfo);
+				free(total_ints);
+			}
+		} else {
+			result[a] = NULL;
+		}
+		array_lengths[a] = total_ints[a];
+	}
+
+	for (int i = 0; i < fragment_count; i++) {
+		int arr = pinfo[i].array_number;
+		int frag = pinfo[i].frag_number;
+		int frag_len = pinfo[i].frag_length;
+		int offset_in_array = 0;
+
+		for (int j = 0; j < fragment_count; j++) {
+			if (pinfo[j].array_number == arr && pinfo[j].frag_number < frag) {
+				offset_in_array += pinfo[j].frag_length;
+			}
+		}
+		int payload_offset = pinfo[i].payload_offset;
+		for (int k = 0; k < frag_len; k++) {
+			int value;
+			if (pinfo[i].endianness == 0) {
+				value = ((unsigned int)packets[payload_offset + k * 4] << 24) | ((unsigned int)packets[payload_offset + k * 4 + 1] << 16) | ((unsigned int)packets[payload_offset + k * 4 + 2] << 8) | ((unsigned int)packets[payload_offset + k * 4 + 3]);
+			} else {
+				value = ((unsigned int)packets[payload_offset + k * 4 + 3] << 24) | ((unsigned int)packets[payload_offset + k * 4 + 2] << 16) | ((unsigned int)packets[payload_offset + k * 4 + 1] << 8) | ((unsigned int)packets[payload_offset + k * 4]);
+			}
+			result[arr][offset_in_array + k] = value;
+		}
+	}
+	free(pinfo);
+	free(total_ints);
+	return result;
 }
 
 
