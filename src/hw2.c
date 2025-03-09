@@ -102,6 +102,7 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 	}
 	return packet_buffer;
 }
+
 int compare_packet_info(const void *a, const void *b) {
     const packet_info_t *pa = a;
     const packet_info_t *pb = b;
@@ -124,14 +125,12 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     
     int pos = 0;
     while (1) {
-        unsigned int header = ((unsigned int)packets[pos] << 16) |
-                              ((unsigned int)packets[pos+1] << 8) |
-                              (unsigned int)packets[pos+2];
-        unsigned int array_num  = (header >> 18) & 0x3F;
-        unsigned int frag_num   = (header >> 13) & 0x1F;
+        unsigned int header = ((unsigned int)packets[pos] << 16) | ((unsigned int)packets[pos+1] << 8) | (unsigned int)packets[pos+2];
+        unsigned int array_num = (header >> 18) & 0x3F;
+        unsigned int frag_num = (header >> 13) & 0x1F;
         unsigned int frag_length = (header >> 3)  & 0x3FF;
         unsigned int endianness = (header >> 1)  & 0x1;
-        unsigned int last       = header & 0x1;
+        unsigned int last = header & 0x1;
         
         if (info_count >= info_capacity) {
             info_capacity *= 2;
@@ -166,9 +165,7 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     
     free(expected_fragments);
     free(fragments_seen);
-    
-    qsort(info, info_count, sizeof(packet_info_t), compare_packet_info);
-    
+        
     int **result = malloc(array_count * sizeof(int *));
     for (int a = 0; a < array_count; a++) {
         result[a] = malloc(array_lengths[a] * sizeof(int));
