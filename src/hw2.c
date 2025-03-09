@@ -120,7 +120,6 @@ int convert_bytes_to_int(unsigned char *data, int is_little_endian) {
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
     int **arrays = (int**)calloc(array_count, sizeof(int*));
     int *temp_sizes = (int*)calloc(array_count, sizeof(int));
-	
     int i = 0;
     while (i < MAX_PACKET_SIZE) {  
         if (i + HEADER_SIZE > MAX_PACKET_SIZE) break; 
@@ -128,19 +127,18 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         int array_num = packets[i];
         int length = packets[i + 3];
 
-        i += HEADER_SIZE;
-        
         if (array_num >= array_count) {
-            i += length * 4;
+            i += HEADER_SIZE + (length * 4);
             continue;
         }
 
         temp_sizes[array_num] += length;
+        i += HEADER_SIZE + (length * 4);
     }
 
     for (int j = 0; j < array_count; j++) {
         if (temp_sizes[j] > 0) {
-            arrays[j] = (int*)calloc(temp_sizes[j], sizeof(int));
+            arrays[j] = (int*)malloc(temp_sizes[j] * sizeof(int));
             array_lengths[j] = temp_sizes[j];
         }
     }
@@ -163,7 +161,9 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         }
 
         for (int j = 0; j < length; j++) {
-            arrays[array_num][current_positions[array_num]++] = convert_bytes_to_int(&packets[i], is_little_endian);
+            if (current_positions[array_num] < array_lengths[array_num]) {
+                arrays[array_num][current_positions[array_num]++] = convert_bytes_to_int(&packets[i], is_little_endian);
+            }
             i += 4;
         }
     }
@@ -172,6 +172,7 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     free(current_positions);
     return arrays;
 }
+
 
 
 //Encryption Code:
