@@ -111,26 +111,27 @@ int compare_packet_info(const void *a, const void *b) {
 }
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths) {
-	    for (int i = 0; i < array_count; i++) {
+    int info_capacity = 10;
+    packet_info_t *info = malloc(info_capacity * sizeof(packet_info_t));
+    int info_count = 0;
+
+    int *expected_fragments = malloc(array_count * sizeof(int));
+    int *fragments_seen = calloc(array_count, sizeof(int));
+    for (int i = 0; i < array_count; i++) {
+        expected_fragments[i] = -1;
         array_lengths[i] = 0;
     }
     
-    int *last_seen = calloc(array_count, sizeof(int));
-    int count_last = 0;
     int pos = 0;
-    
-    int info_capacity = 10, info_count = 0;
-    packet_info_t *info = malloc(info_capacity * sizeof(packet_info_t));
-    
-    while (count_last < array_count) {
-        unsigned int header = ((unsigned int)packets[pos] << 16) | ((unsigned int)packets[pos+1] << 8) | (unsigned int)packets[pos+2];
+    while (1) {
+        unsigned int header = ((unsigned int)packets[pos] << 16) |
+                              ((unsigned int)packets[pos+1] << 8) |
+                              (unsigned int)packets[pos+2];
         unsigned int array_num  = (header >> 18) & 0x3F;
         unsigned int frag_num   = (header >> 13) & 0x1F;
         unsigned int frag_length = (header >> 3)  & 0x3FF;
         unsigned int endianness = (header >> 1)  & 0x1;
         unsigned int last       = header & 0x1;
-        
-        array_lengths[array_num] += frag_length;
         
         if (info_count >= info_capacity) {
             info_capacity *= 2;
@@ -143,18 +144,32 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
         info[info_count].payload_offset = pos + 3;
         info_count++;
         
-        if (last == 1 && last_seen[array_num] == 0) {
-            last_seen[array_num] = 1;
-            count_last++;
+        fragments_seen[array_num]++;
+        array_lengths[array_num] += frag_length;
+        
+        if (last == 1) {
+            expected_fragments[array_num] = frag_num + 1;
         }
         
         pos += 3 + (frag_length * 4);
+        
+        int all_done = 1;
+        for (int i = 0; i < array_count; i++) {
+            if (expected_fragments[i] == -1 || fragments_seen[i] < expected_fragments[i]) {
+                all_done = 0;
+                break;
+            }
+        }
+        if (all_done)
+            break;
     }
-    free(last_seen);
+    
+    free(expected_fragments);
+    free(fragments_seen);
     
     qsort(info, info_count, sizeof(packet_info_t), compare_packet_info);
     
-    int **result = malloc(array_count * sizeof(int*));
+    int **result = malloc(array_count * sizeof(int *));
     for (int a = 0; a < array_count; a++) {
         result[a] = malloc(array_lengths[a] * sizeof(int));
     }
@@ -166,9 +181,15 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
             int payload_index = p.payload_offset + j * 4;
             unsigned int value;
             if (p.endianness == 0) {
-                value = ((unsigned int)packets[payload_index] << 24) | ((unsigned int)packets[payload_index+1] << 16) | ((unsigned int)packets[payload_index+2] << 8) | ((unsigned int)packets[payload_index+3]);
+                value = ((unsigned int)packets[payload_index] << 24) |
+                        ((unsigned int)packets[payload_index+1] << 16) |
+                        ((unsigned int)packets[payload_index+2] << 8) |
+                        ((unsigned int)packets[payload_index+3]);
             } else {
-                value = ((unsigned int)packets[payload_index+3] << 24) | ((unsigned int)packets[payload_index+2] << 16) | ((unsigned int)packets[payload_index+1] << 8) | ((unsigned int)packets[payload_index]);
+                value = ((unsigned int)packets[payload_index+3] << 24) |
+                        ((unsigned int)packets[payload_index+2] << 16) |
+                        ((unsigned int)packets[payload_index+1] << 8) |
+                        ((unsigned int)packets[payload_index]);
             }
             result[p.array_num][insert_index[p.array_num]++] = value;
         }
@@ -178,7 +199,6 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     free(insert_index);
     return result;
 }
-
 #define EXPANDED_KEYS_LENGTH 32
 
 typedef uint64_t sbu_key_t;
