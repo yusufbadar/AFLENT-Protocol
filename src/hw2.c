@@ -111,21 +111,18 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     int *expected_fragments = malloc(array_count * sizeof(int));
     int *fragments_seen = calloc(array_count, sizeof(int));
     for (int i = 0; i < array_count; i++) {
-        expected_fragments[i] = -1;  // unknown initially
-        array_lengths[i] = 0;        // total number of ints for array i
+        expected_fragments[i] = -1; 
+        array_lengths[i] = 0;
     }
     
     int pos = 0;
-    // Loop until every array has seen its expected number of fragments.
     while (1) {
-        unsigned int header = ((unsigned int)packets[pos] << 16) |
-                              ((unsigned int)packets[pos+1] << 8) |
-                              (unsigned int)packets[pos+2];
-        unsigned int array_num  = (header >> 18) & 0x3F;
-        unsigned int frag_num   = (header >> 13) & 0x1F;
+        unsigned int header = ((unsigned int)packets[pos] << 16) | ((unsigned int)packets[pos+1] << 8) | (unsigned int)packets[pos+2];
+        unsigned int array_num = (header >> 18) & 0x3F;
+        unsigned int frag_num = (header >> 13) & 0x1F;
         unsigned int frag_length = (header >> 3)  & 0x3FF;
         unsigned int endianness = (header >> 1)  & 0x1;
-        unsigned int last       = header & 0x1;
+        unsigned int last = header & 0x1;
         
         if (info_count >= info_capacity) {
             info_capacity *= 2;
@@ -157,35 +154,26 @@ int** create_arrays(unsigned char packets[], int array_count, int *array_lengths
     }
     free(fragments_seen);
     
-    // Allocate result arrays using computed sizes.
     int **result = malloc(array_count * sizeof(int *));
     for (int a = 0; a < array_count; a++) {
         result[a] = malloc(array_lengths[a] * sizeof(int));
     }
     int *insert_index = calloc(array_count, sizeof(int));
     
-    // For each array, iterate over expected fragment numbers (in order).
     for (int a = 0; a < array_count; a++) {
         for (unsigned int frag = 0; frag < (unsigned int)expected_fragments[a]; frag++) {
-            // Multiple passes: scan through all packet info to find the one matching this array and fragment number.
             for (int i = 0; i < info_count; i++) {
                 if (info[i].array_num == (unsigned int)a && info[i].frag_num == frag) {
                     for (unsigned int j = 0; j < info[i].frag_length; j++) {
                         int payload_index = info[i].payload_offset + j * 4;
                         unsigned int value;
                         if (info[i].endianness == 0)
-                            value = ((unsigned int)packets[payload_index] << 24) |
-                                    ((unsigned int)packets[payload_index+1] << 16) |
-                                    ((unsigned int)packets[payload_index+2] << 8) |
-                                    ((unsigned int)packets[payload_index+3]);
+                            value = ((unsigned int)packets[payload_index] << 24) | ((unsigned int)packets[payload_index+1] << 16) | ((unsigned int)packets[payload_index+2] << 8) | ((unsigned int)packets[payload_index+3]);
                         else
-                            value = ((unsigned int)packets[payload_index+3] << 24) |
-                                    ((unsigned int)packets[payload_index+2] << 16) |
-                                    ((unsigned int)packets[payload_index+1] << 8) |
-                                    ((unsigned int)packets[payload_index]);
+                            value = ((unsigned int)packets[payload_index+3] << 24) | ((unsigned int)packets[payload_index+2] << 16) | ((unsigned int)packets[payload_index+1] << 8) | ((unsigned int)packets[payload_index]);
                         result[a][insert_index[a]++] = value;
                     }
-                    break;  // Found the matching fragment; no need to continue scanning.
+                    break;
                 }
             }
         }
