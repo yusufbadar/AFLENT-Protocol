@@ -213,11 +213,13 @@ uint8_t rotl(uint8_t x, uint8_t shamt)
     return (uint8_t)((x << shamt) | (x >> (8 - shamt)));
 }
 
-uint8_t rotr(uint8_t x, uint8_t shamt) {
+uint8_t rotr(uint8_t x, uint8_t shamt)
+{
     return (uint8_t)((x >> shamt) | (x << (8 - shamt)));
 }
 
-block_t reverse(block_t x) {
+block_t reverse(block_t x)
+{
     block_t r = 0;
     for (int i = 0; i < 32; i++) {
         r |= ((x >> i) & 1) << (31 - i);
@@ -225,7 +227,8 @@ block_t reverse(block_t x) {
     return r;
 }
 
-block_t shuffle4(block_t x) {
+block_t shuffle4(block_t x)
+{
     uint32_t a = (x >> 28) & 0xF;
     uint32_t b = (x >> 24) & 0xF;
     uint32_t c = (x >> 20) & 0xF;
@@ -237,7 +240,8 @@ block_t shuffle4(block_t x) {
     return (a << 28) | (e << 24) | (b << 20) | (f << 16) | (c << 12) | (g << 8) | (d << 4) | h;
 }
 
-block_t unshuffle4(block_t x) {
+block_t unshuffle4(block_t x)
+{
     uint32_t a = (x >> 28) & 0xF;
     uint32_t e = (x >> 24) & 0xF;
     uint32_t b = (x >> 20) & 0xF;
@@ -249,7 +253,8 @@ block_t unshuffle4(block_t x) {
     return (a << 28) | (b << 24) | (c << 20) | (d << 16) | (e << 12) | (f << 8) | (g << 4) | h;
 }
 
-block_t shuffle1(block_t x) {
+block_t shuffle1(block_t x)
+{
     uint16_t L = x & 0xFFFF;
     uint16_t U = (x >> 16) & 0xFFFF;
     block_t res = 0;
@@ -261,7 +266,8 @@ block_t shuffle1(block_t x) {
     return res;
 }
 
-block_t unshuffle1(block_t x) {
+block_t unshuffle1(block_t x)
+{
     uint16_t L = 0, U = 0;
     for (int i = 0; i < 16; i++) {
         int shift = 2 * (15 - i);
@@ -271,7 +277,8 @@ block_t unshuffle1(block_t x) {
     return ((block_t)U << 16) | L;
 }
 
-uint8_t nth_byte(block_t x, uint8_t n) {
+uint8_t nth_byte(block_t x, uint8_t n)
+{
     return (uint8_t)((x >> (8 * (n % 4))) & 0xFF);
 }
 
@@ -282,7 +289,7 @@ uint8_t scramble_op(block_t B, int i, block_t keyA, block_t keyB)
     int i1 = (i + 3) % 4;
     int i2 = (i + 2) % 4;
     int i3 = (i + 1) % 4;
-    uint8_t b = nth_byte(B, i);
+    uint8_t b  = nth_byte(B, i);
     uint8_t b1 = nth_byte(B, i1);
     uint8_t b2 = nth_byte(B, i2);
     uint8_t b3 = nth_byte(B, i3);
@@ -320,15 +327,20 @@ block_t mash(block_t B, uint32_t *S)
     return ((block_t)nb[0]) | ((block_t)nb[1] << 8) | ((block_t)nb[2] << 16) | ((block_t)nb[3] << 24);
 }
 
+block_t rotr32(block_t x, uint8_t shamt) {
+    return (x >> shamt) | (x << (32 - shamt));
+}
+
 uint8_t r_scramble_op(block_t B, int i, block_t keyA, block_t keyB)
 {
+    block_t B1 = rotr32(B, r_rot_table[i]);
     int i1 = (i + 3) % 4;
     int i2 = (i + 2) % 4;
     int i3 = (i + 1) % 4;
-    uint8_t b = rotr(nth_byte(B, i), r_rot_table[i]);
-    uint8_t b1 = rotr(nth_byte(B, i1), r_rot_table[i1]);
-    uint8_t b2 = rotr(nth_byte(B, i2), r_rot_table[i2]);
-    uint8_t b3 = rotr(nth_byte(B, i3), r_rot_table[i3]);
+    uint8_t b  = nth_byte(B1, i);
+    uint8_t b1 = nth_byte(B1, i1);
+    uint8_t b2 = nth_byte(B1, i2);
+    uint8_t b3 = nth_byte(B1, i3);
     uint8_t ka = nth_byte(keyA, i);
     uint8_t kb = nth_byte(keyB, i);
     return b ^ (b1 & b2) ^ ((~b1) & b3) ^ ka ^ kb;
@@ -343,7 +355,8 @@ block_t r_scramble(block_t B, uint32_t *S, int j, permute_func_t op)
     nb[2] = r_scramble_op(B, 2, keyA, keyB);
     nb[1] = r_scramble_op(B, 1, keyA, keyB);
     nb[0] = r_scramble_op(B, 0, keyA, keyB);
-    block_t temp = ((block_t)nb[0]) | ((block_t)nb[1] << 8) | ((block_t)nb[2] << 16) | ((block_t)nb[3] << 24);
+    block_t temp = ((block_t)nb[0]) | ((block_t)nb[1] << 8) |
+                   ((block_t)nb[2] << 16) | ((block_t)nb[3] << 24);
     return op(temp);
 }
 
@@ -354,7 +367,8 @@ block_t r_mash(block_t B, uint32_t *S)
     nb[2] = mash_op(B, S, 2);
     nb[1] = mash_op(B, S, 1);
     nb[0] = mash_op(B, S, 0);
-    return ((block_t)nb[0]) | ((block_t)nb[1] << 8) | ((block_t)nb[2] << 16) | ((block_t)nb[3] << 24);
+    return ((block_t)nb[0]) | ((block_t)nb[1] << 8) |
+           ((block_t)nb[2] << 16) | ((block_t)nb[3] << 24);
 }
 
 block_t encrypt_block(block_t B, uint32_t *S)
