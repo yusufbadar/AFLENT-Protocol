@@ -256,7 +256,7 @@ block_t shuffle1(block_t x) {
     for (int i = 0; i < 16; i++) {
         int shift = 2 * (15 - i);
         res |= ((uint32_t)((U >> (15 - i)) & 1)) << (shift + 1);
-        res |= ((uint32_t)((L >> (15 - i)) & 1)) << (shift);
+        res |= ((uint32_t)((L >> (15 - i)) & 1)) << shift;
     }
     return res;
 }
@@ -405,6 +405,7 @@ block_t decrypt_block(block_t B, uint32_t *S)
     return B;
 }
 
+
 void sbu_expand_keys(sbu_key_t key, block_t *S)
 {
     S[0] = (block_t)(key & 0xFFFFFFFFULL);
@@ -419,8 +420,6 @@ void sbu_expand_keys(sbu_key_t key, block_t *S)
         S[i] = table[temp % 64] ^ S[i];
     }
 }
-
-
 
 void sbu_encrypt(uint8_t *plaintext_input, block_t *encrypted_output, size_t pt_len, uint32_t *expanded_keys)
 {
